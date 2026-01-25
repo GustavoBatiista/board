@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.mysql.cj.jdbc.StatementImpl;
 import static br.com.gustavobatista.board.persistence.entity.BoardColumnKindEnum.findByName;
@@ -11,6 +12,7 @@ import static br.com.gustavobatista.board.persistence.entity.BoardColumnKindEnum
 import br.com.gustavobatista.board.persistence.dto.BoardColumnDTO;
 import br.com.gustavobatista.board.persistence.entity.BoardColumnEntity;
 import br.com.gustavobatista.board.persistence.entity.BoardColumnKindEnum;
+import br.com.gustavobatista.board.persistence.entity.CardEntity;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -35,11 +37,11 @@ public class BoardColumnDao {
 
     }
 
-    public List<BoardColumnEntity> findByBoardId(final Long id) throws SQLException {
+    public List<BoardColumnEntity> findByBoardId(final Long boardId) throws SQLException {
         List<BoardColumnEntity> entities = new ArrayList<>();
         var sql = "SELECT id, name,`order`,kind FROM BOARDS_COLUMNS WHERE boards_id = ? ORDER BY `order`";
         try (var statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, id);
+            statement.setLong(1, boardId);
             statement.executeQuery();
             var resultSet = statement.getResultSet();
             while (resultSet.next()) {
@@ -54,34 +56,66 @@ public class BoardColumnDao {
         }
     }
 
-    public List<BoardColumnDTO> findByBoardIdWithDetails(final Long id) throws SQLException {
+    public List<BoardColumnDTO> findByBoardIdWithDetails(final Long boardId) throws SQLException {
         List<BoardColumnDTO> dtos = new ArrayList<>();
         var sql = """
                 SELECT bc.id,
                  bc.name,
                  bc.kind,
                  COUNT(SELECT c.id
-                    FROM CARDS c 
+                    FROM CARDS c
                     WHERE c.board_columns_id = bc.id) cards_amount
                  FROM BOARDS_COLUMNS bc
                   WHERE boards_id = ?
                   ORDER BY `order`
                 """;
         try (var statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, id);
+            statement.setLong(1, boardId);
             statement.executeQuery();
             var resultSet = statement.getResultSet();
             while (resultSet.next()) {
                 var dto = new BoardColumnDTO(
-                    resultSet.getLong("bc.id"),
-                    resultSet.getString("bc.name"),
-                    findByName(resultSet.getString("bc.kind")),
-                    resultSet.getInt("cards_amount")
-                );
+                        resultSet.getLong("bc.id"),
+                        resultSet.getString("bc.name"),
+                        findByName(resultSet.getString("bc.kind")),
+                        resultSet.getInt("cards_amount"));
                 dtos.add(dto);
             }
             return dtos;
         }
     }
 
+    public Optional<BoardColumnEntity> findById(final Long boardId) throws SQLException {
+        var sql = 
+        """
+        SELECT bc.name,
+               bc.kind,
+               c.id,
+               c.title,
+               c.description,
+               FROM BOARDS_COLUMNS bc
+               INNER JOIN CARDS c
+                ON c.board_columns_id = bc.id
+               WHERE bc.id = ?
+        """;
+        try (var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, boardId);
+            statement.executeQuery();
+            var resultSet = statement.getResultSet();
+            if(resultSet.next()) {
+                var entity = new BoardColumnEntity();
+                entity.setName(resultSet.getString("bc.name"));
+                entity.setKind(findByName(resultSet.getString("bc.kind")));
+            do {
+                var card = new CardEntity();
+                card.setId(resultSet.getLong("c.id"));
+                card.setTitle(resultSet.getString("c.title"));
+                card.setDescription(resultSet.getString("c.description"));
+                entity.getCards().add(card);
+            }while(resultSet.next());
+            
+        }
+        return Optional.empty();
+    }
+}
 }

@@ -4,8 +4,11 @@ import java.sql.SQLException;
 import java.util.Scanner;
 
 import br.com.gustavobatista.board.persistence.config.ConnectionConfig;
+import br.com.gustavobatista.board.persistence.entity.BoardColumnEntity;
 import br.com.gustavobatista.board.persistence.entity.BoardEntity;
+import br.com.gustavobatista.board.service.BoardColumnQueryService;
 import br.com.gustavobatista.board.service.BoardQueryService;
+import br.com.gustavobatista.board.service.CardQueryService;
 import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
@@ -45,7 +48,7 @@ public class BoardMenu {
                     default -> System.out.println("Opção inválida, informe uma opção do menu");
                 }
             }
-        }catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
             System.exit(0);
         }
@@ -87,14 +90,44 @@ public class BoardMenu {
         }
     }
 
-    private Object showColumn() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'showColumn'");
+    private void showColumn() throws SQLException {
+        System.out.printf("Escolha uma coluna do board %s\n", entity.getName());
+        var columnsIds = entity.getBoardColumns()
+                .stream()
+                .map(BoardColumnEntity::getId)
+                .toList();
+        var selectedColumn = -1L;
+        while (!columnsIds.contains(selectedColumn)) {
+            entity.getBoardColumns()
+                    .forEach(c -> System.out.printf("%s - %s [%s]\n", c.getId(), c.getName(), c.getKind()));
+            selectedColumn = scanner.nextLong();
+        }
+        try (var connection = ConnectionConfig.getConnection()) {
+            var column = new BoardColumnQueryService(connection).findById(selectedColumn);
+            column.ifPresent(co -> {
+                System.out.printf("Coluna: [%s] tipo: [%s] \n", co.getName(), co.getKind());
+                co.getCards().forEach(ca -> System.out.printf("Card: [%s] - %s.\nDescrição: %s",
+                        ca.getId(), ca.getTitle(), ca.getDescription()));
+            });
+        }
     }
 
-    private Object showCard() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'showCard'");
+    private void showCard() throws SQLException {
+        System.out.println("Informe o id do card a ser visualizado: ");
+        var selectedCardId = scanner.nextLong();
+        try(var connection = ConnectionConfig.getConnection()) {
+            new CardQueryService(connection).findById(selectedCardId)
+            .ifPresentOrElse(c -> {
+                System.out.printf("Card: %s - %S.\n",c.id(), c.title());
+                System.out.printf("Descrição: %s\n", c.description());
+                System.out.printf(c.blocked() ? 
+                "Está bloqueado. Motivo: %s" + c.blockReason() :
+                 "Não está bloqueado.");
+                System.out.printf("Já foi bloqueado %s vezes.\n", c.blockAmount());
+                System.out.printf("Está no momento na Coluna: %s - %s.\n", c.columnId(), c.columnName());
+                },
+                () -> System.out.printf("Não existe um card com id %s\n", selectedCardId));
+        }
     }
 
 }
