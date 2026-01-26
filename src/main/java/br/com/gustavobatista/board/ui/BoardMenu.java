@@ -4,11 +4,14 @@ import java.sql.SQLException;
 import java.util.Scanner;
 
 import br.com.gustavobatista.board.persistence.config.ConnectionConfig;
+import br.com.gustavobatista.board.persistence.dto.BoardColumnIdInfoDTO;
 import br.com.gustavobatista.board.persistence.entity.BoardColumnEntity;
 import br.com.gustavobatista.board.persistence.entity.BoardEntity;
+import br.com.gustavobatista.board.persistence.entity.CardEntity;
 import br.com.gustavobatista.board.service.BoardColumnQueryService;
 import br.com.gustavobatista.board.service.BoardQueryService;
 import br.com.gustavobatista.board.service.CardQueryService;
+import br.com.gustavobatista.board.service.CardService;
 import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
@@ -20,7 +23,7 @@ public class BoardMenu {
 
     public void execute() {
         try {
-            System.out.printf("Bem vindo ao board %s, selecione a operação desejada: %n", entity.getId());
+            System.out.printf("Bem vindo ao board %s, selecione a operação desejada:\n", entity.getId());
             var option = -1;
             while (option != 9) {
                 System.out.println("1 - Criar um card");
@@ -54,29 +57,54 @@ public class BoardMenu {
         }
     }
 
-    private Object createCard() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'createCard'");
+    private void createCard() throws SQLException {
+        var card = new CardEntity();
+        System.out.println("Informe o titulo do card: ");
+        card.setTitle(scanner.next());
+        System.out.println("Informe a descrição do card: ");
+        card.setDescription(scanner.next());
+        card.setBoardColumn(entity.getInitialColumn());
+        try (var connection = ConnectionConfig.getConnection()) {
+            new CardService(connection).insert(card);
+        }
     }
 
-    private Object moveCardToNextColumn() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'moveCardToNextColumn'");
+    private void moveCardToNextColumn() throws SQLException {
+        System.out.println("Informe o id do card a ser movido para a próxima coluna: ");
+        var CardId = scanner.nextLong();
+        var boardColumnsInfo = entity.getBoardColumns().stream()
+                .map(bc -> new BoardColumnIdInfoDTO(bc.getId(), bc.getOrder(), bc.getKind()))
+                .toList();
+        try (var connection = ConnectionConfig.getConnection()) {
+            new CardService(connection).moveToNextColumn(CardId, boardColumnsInfo);
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
+        }
     }
 
-    private Object blockCard() {
+    private void blockCard() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'blockCard'");
     }
 
-    private Object unblockCard() {
+    private void unblockCard() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'unblockCard'");
     }
 
-    private Object cancelCard() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'cancelCard'");
+    private void cancelCard() throws SQLException {
+        System.out.println("Informe o id do card a ser movido para a coluna de cancelamento: ");
+        var CardId = scanner.nextLong();
+        var cancelColumn = entity.getCancelColumn();
+        var boardColumnsInfo = entity.getBoardColumns().stream()
+                .map(bc -> new BoardColumnIdInfoDTO(bc.getId(), bc.getOrder(), bc.getKind()))
+                .toList();
+        try (var connection = ConnectionConfig.getConnection()) {
+            new CardService(connection).cancel(CardId, cancelColumn.getId(), boardColumnsInfo);
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
+        }
+
     }
 
     private void showBoard() throws SQLException {
@@ -106,7 +134,7 @@ public class BoardMenu {
             var column = new BoardColumnQueryService(connection).findById(selectedColumn);
             column.ifPresent(co -> {
                 System.out.printf("Coluna: [%s] tipo: [%s] \n", co.getName(), co.getKind());
-                co.getCards().forEach(ca -> System.out.printf("Card: [%s] - %s.\nDescrição: %s",
+                co.getCards().forEach(ca -> System.out.printf("Card: [%s] - %s.\nDescrição: %s\n",
                         ca.getId(), ca.getTitle(), ca.getDescription()));
             });
         }
@@ -115,18 +143,17 @@ public class BoardMenu {
     private void showCard() throws SQLException {
         System.out.println("Informe o id do card a ser visualizado: ");
         var selectedCardId = scanner.nextLong();
-        try(var connection = ConnectionConfig.getConnection()) {
+        try (var connection = ConnectionConfig.getConnection()) {
             new CardQueryService(connection).findById(selectedCardId)
-            .ifPresentOrElse(c -> {
-                System.out.printf("Card: %s - %S.\n",c.id(), c.title());
-                System.out.printf("Descrição: %s\n", c.description());
-                System.out.printf(c.blocked() ? 
-                "Está bloqueado. Motivo: %s" + c.blockReason() :
-                 "Não está bloqueado.");
-                System.out.printf("Já foi bloqueado %s vezes.\n", c.blockAmount());
-                System.out.printf("Está no momento na Coluna: %s - %s.\n", c.columnId(), c.columnName());
-                },
-                () -> System.out.printf("Não existe um card com id %s\n", selectedCardId));
+                    .ifPresentOrElse(c -> {
+                        System.out.printf("Card: %s - %S.\n", c.id(), c.title());
+                        System.out.printf("Descrição: %s\n", c.description());
+                        System.out.printf(
+                                c.blocked() ? "Está bloqueado. Motivo: %s" + c.blockReason() : "Não está bloqueado.");
+                        System.out.printf("Já foi bloqueado %s vezes.\n", c.blockAmount());
+                        System.out.printf("Está no momento na Coluna: %s - %s.\n", c.columnId(), c.columnName());
+                    },
+                            () -> System.out.printf("Não existe um card com id %s\n", selectedCardId));
         }
     }
 

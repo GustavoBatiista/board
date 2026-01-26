@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.mysql.cj.jdbc.StatementImpl;
 
+
 import br.com.gustavobatista.board.persistence.entity.BoardEntity;
 import lombok.AllArgsConstructor;
 
