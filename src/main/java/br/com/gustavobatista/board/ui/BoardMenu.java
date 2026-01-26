@@ -82,14 +82,33 @@ public class BoardMenu {
         }
     }
 
-    private void blockCard() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'blockCard'");
+    private void blockCard() throws SQLException {
+        System.out.println("Informe o id do card a ser bloqueado: ");
+        var cardId = scanner.nextLong();
+        System.out.println("Informe o motivo do bloqueio do card: ");
+        var reason = scanner.next();
+        var boardColumnsInfo = entity.getBoardColumns().stream()
+                .map(bc -> new BoardColumnIdInfoDTO(bc.getId(), bc.getOrder(), bc.getKind()))
+                .toList();
+        try (var connection = ConnectionConfig.getConnection()) {
+            new CardService(connection).block(cardId, reason, boardColumnsInfo);
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
+        }
+
     }
 
-    private void unblockCard() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'unblockCard'");
+    private void unblockCard() throws SQLException {
+        System.out.println("Informe o id do card a ser desbloqueado: ");
+        var cardId = scanner.nextLong();
+        System.out.println("Informe o motivo do desbloqueio do card: ");
+        var reason = scanner.next();
+        try (var connection = ConnectionConfig.getConnection()) {
+            new CardService(connection).unblock(cardId, reason);
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
+        }
+
     }
 
     private void cancelCard() throws SQLException {
